@@ -40,7 +40,8 @@
             button1.Location = new Point(243, 12);
             button1.Name = "button1";
             button1.Size = new Size(40, 23);
-            button1.TabIndex = 3;
+            button1.TabIndex = 8888;
+            button1.TabStop = false;
             button1.Text = "Add";
             button1.UseVisualStyleBackColor = true;
             button1.Click += button1_Click;
@@ -51,7 +52,8 @@
             textBox1.Name = "textBox1";
             textBox1.PlaceholderText = "process.exe";
             textBox1.Size = new Size(169, 23);
-            textBox1.TabIndex = 2;
+            textBox1.TabIndex = 9999;
+            textBox1.TabStop = false;
             // 
             // label1
             // 
@@ -76,7 +78,9 @@
             MinimizeBox = false;
             Name = "QuickProcessAddForm";
             SizeGripStyle = SizeGripStyle.Hide;
+            StartPosition = FormStartPosition.Manual;
             Text = "Mouse Mender - Add Process";
+            Load += QuickProcessAddForm_Load;
             ResumeLayout(false);
             PerformLayout();
         }

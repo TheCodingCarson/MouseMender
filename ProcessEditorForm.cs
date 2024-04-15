@@ -1,14 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-
-namespace Mouse_Mender
+﻿namespace Mouse_Mender
 {
     public partial class ProcessEditorForm : Form
     {
@@ -20,6 +10,9 @@ namespace Mouse_Mender
         // ProcessEditorForm Load Event
         private void ProcessEditorForm_Load(object sender, EventArgs e)
         {
+            // Set ProcessEditorForm start location to center of MainForm's current position
+            this.Location = CalculateStartPosition();
+
             // Fill List Box with Saved Processes
             listBox1.Items.Clear();
             if (Properties.Settings.Default.AutoEnableProcessList != null)
@@ -29,6 +22,25 @@ namespace Mouse_Mender
                     listBox1.Items.Add(process);
                 }
             }
+        }
+
+        // Calculate Start Position From MainForm Size & Current Location
+        private Point CalculateStartPosition()
+        {
+            // MainForm dimensions and location
+            Point mainFormSavedLocation = Properties.Settings.Default.LastWindowLocation;
+            int mainFormWidth = 429;
+            int mainFormHeight = 250;
+
+            // ProcessEditorForm dimensions
+            int processEditorFormWidth = 328;
+            int processEditorFormHeight = 250;
+
+            // Calculate center position for a child form
+            int newX = mainFormSavedLocation.X + (mainFormWidth - processEditorFormWidth) / 2;
+            int newY = mainFormSavedLocation.Y + (mainFormHeight - processEditorFormHeight) / 2;
+
+            return new Point(newX, newY);
         }
 
         // Add Process

@@ -125,7 +125,9 @@
             MinimizeBox = false;
             Name = "AboutForm";
             SizeGripStyle = SizeGripStyle.Hide;
+            StartPosition = FormStartPosition.Manual;
             Text = "Mouse Mender - About";
+            Load += AboutForm_Load;
             ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
             groupBox4.ResumeLayout(false);
             groupBox4.PerformLayout();

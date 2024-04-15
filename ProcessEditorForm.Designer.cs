@@ -47,7 +47,8 @@
             listBox1.Location = new Point(2, 39);
             listBox1.Name = "listBox1";
             listBox1.Size = new Size(308, 169);
-            listBox1.TabIndex = 0;
+            listBox1.TabIndex = 4444;
+            listBox1.TabStop = false;
             // 
             // groupBox1
             // 
@@ -70,7 +71,8 @@
             button4.Location = new Point(220, 15);
             button4.Name = "button4";
             button4.Size = new Size(26, 23);
-            button4.TabIndex = 4;
+            button4.TabIndex = 7777;
+            button4.TabStop = false;
             button4.Text = "↓";
             button4.UseVisualStyleBackColor = true;
             button4.Click += button4_Click;
@@ -81,7 +83,8 @@
             button3.Location = new Point(252, 15);
             button3.Name = "button3";
             button3.Size = new Size(26, 23);
-            button3.TabIndex = 3;
+            button3.TabIndex = 6666;
+            button3.TabStop = false;
             button3.Text = "↑";
             button3.UseVisualStyleBackColor = true;
             button3.Click += button3_Click;
@@ -92,7 +95,8 @@
             button2.Location = new Point(284, 15);
             button2.Name = "button2";
             button2.Size = new Size(26, 23);
-            button2.TabIndex = 2;
+            button2.TabIndex = 5555;
+            button2.TabStop = false;
             button2.Text = "🗑️";
             button2.UseVisualStyleBackColor = true;
             button2.Click += button2_Click;
@@ -103,7 +107,8 @@
             button1.Location = new Point(179, 15);
             button1.Name = "button1";
             button1.Size = new Size(26, 23);
-            button1.TabIndex = 1;
+            button1.TabIndex = 8888;
+            button1.TabStop = false;
             button1.Text = "+";
             button1.UseVisualStyleBackColor = true;
             button1.Click += button1_Click;
@@ -114,7 +119,8 @@
             textBox1.Name = "textBox1";
             textBox1.PlaceholderText = "process.exe";
             textBox1.Size = new Size(169, 23);
-            textBox1.TabIndex = 0;
+            textBox1.TabIndex = 9999;
+            textBox1.TabStop = false;
             // 
             // label13
             // 

@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
+using System.Reflection;
 
 namespace Mouse_Mender
 {
@@ -16,11 +18,14 @@ namespace Mouse_Mender
         private const uint MOD_ALT = 0x0001;
 
         // Instances & Variables
+        private Version version = Assembly.GetExecutingAssembly().GetName().Version;
+        private string versionFormatted;
         private AboutForm aboutForm;
         private ProcessEditorForm processEditorForm;
         private QuickProcessAddForm quickProcessAddForm;
         private HashSet<Keys> pressedKeys = new HashSet<Keys>();
         private Screen lockedScreen = null;
+        private bool resolutionChange = false;
         private bool isRunning = false;
         private bool forceClose = false;
 
@@ -28,6 +33,7 @@ namespace Mouse_Mender
         public MainForm()
         {
             InitializeComponent();
+            SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged; // Detect Resolution Changes
         }
 
         // MainForm Closed Event
@@ -39,6 +45,27 @@ namespace Mouse_Mender
         // MainForm Load Event
         private void MainForm_Load(object sender, EventArgs e)
         {
+            // Check if start Window Location is visible
+            bool isLocationValidAndWithinBounds = Properties.Settings.Default.LastWindowLocation != Point.Empty && Properties.Settings.Default.LastWindowLocation != new Point(0, 0) && IsLocationWithinScreens(Properties.Settings.Default.LastWindowLocation);
+
+            if (!isLocationValidAndWithinBounds)
+            {
+                // Get Primary screen center location
+                Rectangle primaryScreenBounds = Screen.PrimaryScreen.Bounds;
+                Point centerPoint = new Point(primaryScreenBounds.Width / 2 - this.Width / 2, primaryScreenBounds.Height / 2 - this.Height / 2);
+
+                // Open in Center
+                this.Location = centerPoint;
+
+                // Re-save Location
+                Properties.Settings.Default.LastWindowLocation = this.Location;
+                Properties.Settings.Default.Save();
+            }
+            else
+            {
+                // Default - Open in Last Location
+                this.Location = Properties.Settings.Default.LastWindowLocation;
+            }
 
             // Register Hotkey (if enabled)
             if (Properties.Settings.Default.EnableHotkeys)
@@ -112,6 +139,10 @@ namespace Mouse_Mender
             }
 
             textBox1.Text = Properties.Settings.Default.Hotkey; // Hotkey
+
+            versionFormatted = $"{version.Major}.{version.Minor}.{version.Build}"; // Format Version String
+            
+            label7.Text = "Mouse Mender v" + versionFormatted; // Version Label
         }
 
         // MainForm FormClosing Event
@@ -126,11 +157,37 @@ namespace Mouse_Mender
             }
             else
             {
-                // --Necessary cleanup if closing--
+                // Re-save Location
+                Properties.Settings.Default.LastWindowLocation = this.Location;
+                Properties.Settings.Default.Save();
 
-                // Unregister the hotkey
+                // --Necessary cleanup if closing--
                 UnregisterHotKey(this.Handle, hotkeyId);
+                SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             }
+        }
+
+        // MainForm LocationChanged Event
+        private void MainForm_LocationChanged(object sender, EventArgs e)
+        {
+            if (this.WindowState == FormWindowState.Normal)
+            {
+                Properties.Settings.Default.LastWindowLocation = this.Location;
+                Properties.Settings.Default.Save();
+            }
+        }
+
+        // Check if loading Window location is visible - Helper Function
+        private bool IsLocationWithinScreens(Point location)
+        {
+            foreach (Screen screen in Screen.AllScreens)
+            {
+                if (screen.WorkingArea.Contains(location))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         // ---System Tray---
@@ -194,8 +251,14 @@ namespace Mouse_Mender
             // Check if the process editor form is either not created or has been disposed
             if (processEditorForm == null || processEditorForm.IsDisposed)
             {
+                // Re-save MainForm Location
+                Properties.Settings.Default.LastWindowLocation = this.Location;
+                Properties.Settings.Default.Save();
+
+                // Open ProcessEditorForm
                 processEditorForm = new ProcessEditorForm();
                 processEditorForm.Show();
+
                 // Subscribe to the process editor form FormClosed event
                 processEditorForm.FormClosed += (s, args) => processEditorForm = null;
             }
@@ -212,8 +275,14 @@ namespace Mouse_Mender
             // Check if the quick add process form is either not created or has been disposed
             if (quickProcessAddForm == null || quickProcessAddForm.IsDisposed)
             {
+                // Re-save MainForm Location
+                Properties.Settings.Default.LastWindowLocation = this.Location;
+                Properties.Settings.Default.Save();
+
+                // Open QuickProcessAddForm
                 quickProcessAddForm = new QuickProcessAddForm();
                 quickProcessAddForm.Show();
+
                 // Subscribe to the process editor form FormClosed event
                 quickProcessAddForm.FormClosed += (s, args) => quickProcessAddForm = null;
             }
@@ -303,8 +372,14 @@ namespace Mouse_Mender
             // Check if the about form is either not created or has been disposed
             if (aboutForm == null || aboutForm.IsDisposed)
             {
+                // Re-save MainForm Location
+                Properties.Settings.Default.LastWindowLocation = this.Location;
+                Properties.Settings.Default.Save();
+
+                // Open AboutForm
                 aboutForm = new AboutForm();
                 aboutForm.Show();
+
                 // Subscribe to the about form FormClosed event
                 aboutForm.FormClosed += (s, args) => aboutForm = null;
             }
@@ -339,15 +414,19 @@ namespace Mouse_Mender
         private void LockMouse()
         {
             isRunning = true;
-            lockedScreen = GetTargetMonitor();
 
-            // Set UI
-            label2.Text = "Enabled";
-            label2.ForeColor = Color.DarkGreen;
+            if (!resolutionChange)
+            {
+                lockedScreen = GetTargetMonitor();
 
-            // Set Systray
-            statusDisabledToolStripMenuItem.Text = "Enabled";
-            enableMouseMenderToolStripMenuItem.Text = "Disable Mouse Lock";
+                // Set UI
+                label2.Text = "Enabled";
+                label2.ForeColor = Color.DarkGreen;
+
+                // Set Systray
+                statusDisabledToolStripMenuItem.Text = "Enabled";
+                enableMouseMenderToolStripMenuItem.Text = "Disable Mouse Lock";
+            }
 
             // Lock Mouse
             if (lockedScreen == null)
@@ -367,15 +446,19 @@ namespace Mouse_Mender
         private void unlockMouse()
         {
             isRunning = false;
-            lockedScreen = null;
 
-            // Set UI
-            label2.Text = "Disabled";
-            label2.ForeColor = Color.DarkRed;
+            if (!resolutionChange)
+            {
+                lockedScreen = null;
 
-            // Set Systray
-            statusDisabledToolStripMenuItem.Text = "Disabled";
-            enableMouseMenderToolStripMenuItem.Text = "Enable Mouse Lock";
+                // Set UI
+                label2.Text = "Disabled";
+                label2.ForeColor = Color.DarkRed;
+
+                // Set Systray
+                statusDisabledToolStripMenuItem.Text = "Disabled";
+                enableMouseMenderToolStripMenuItem.Text = "Enable Mouse Lock";
+            }           
 
             // Unlock Mouse
             ClipCursor(IntPtr.Zero);
@@ -384,20 +467,37 @@ namespace Mouse_Mender
         // Get Screen Based On Preference
         private Screen GetTargetMonitor()
         {
-            // Read the setting to determine which monitor to use
             var monitorPreference = Properties.Settings.Default.MonitorPreference;
             if (monitorPreference == "CurrentMonitorWithMouse")
             {
-                // Get the current screen where the mouse cursor is located
                 Point cursorPos = Cursor.Position;
-                return Screen.FromPoint(cursorPos);
+                return Screen.FromPoint(cursorPos); // Get the current screen where the mouse cursor is located
             }
             else if (monitorPreference == "PrimaryMonitor")
             {
-                // Get the primary screen
-                return Screen.PrimaryScreen;
+                return Screen.PrimaryScreen; // Get the primary screen
             }
-            return null; // Default case if no valid setting is found
+            return null;
+        }
+
+        // Re-apply the ClipCursor To Account For Resolution Change
+        private void OnDisplaySettingsChanged(object sender, EventArgs e)
+        {
+            if (isRunning && lockedScreen != null)
+            {
+                // Set UI
+                label2.Text = "Resetting";
+                label2.ForeColor = Color.DarkGoldenrod;
+
+                resolutionChange = true;
+                unlockMouse(); // Resetting Locked Screen Settings
+                LockMouse();   // Re-locking the mouse cursor to the monitor
+                resolutionChange = false;
+
+                // Set UI Back
+                label2.Text = "Enabled";
+                label2.ForeColor = Color.DarkGreen;
+            }
         }
 
         // ---Hotkeys--

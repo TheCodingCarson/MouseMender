@@ -512,10 +512,12 @@
             MaximizeBox = false;
             Name = "MainForm";
             SizeGripStyle = SizeGripStyle.Hide;
+            StartPosition = FormStartPosition.Manual;
             Text = "Mouse Mender";
             FormClosing += MainForm_FormClosing;
             FormClosed += MainForm_FormClosed;
             Load += MainForm_Load;
+            LocationChanged += MainForm_LocationChanged;
             topmenuStrip.ResumeLayout(false);
             topmenuStrip.PerformLayout();
             groupBox1.ResumeLayout(false);
