@@ -1,9 +1,12 @@
-﻿namespace Mouse_Mender
+﻿using Mouse_Mender.Modules;
+
+namespace Mouse_Mender
 {
     public partial class ProcessEditorForm : Form
     {
         // Declared Variables
         private MainForm mainForm;
+        private AutoProcessEnable autoProcessEnable;
 
         public ProcessEditorForm()
         {
@@ -66,7 +69,7 @@
                 textBox1.Clear();
 
                 // Reset Auto Enable in MainForm
-                mainForm.RestartAutoEnableTimer();
+                autoProcessEnable.RestartAutoEnableTimer();
             }
             else
             {
@@ -88,7 +91,7 @@
                 listBox1.Items.RemoveAt(listBox1.SelectedIndex);
 
                 // Reset Auto Enable in MainForm
-                mainForm.RestartAutoEnableTimer();
+                autoProcessEnable.RestartAutoEnableTimer();
             }
         }
 

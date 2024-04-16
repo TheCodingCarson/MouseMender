@@ -1,86 +1,35 @@
-using System.Runtime.InteropServices;
-using Microsoft.Win32;
 using System.Reflection;
-using System.Diagnostics;
+using Mouse_Mender.Modules;
 
 namespace Mouse_Mender
 {
     public partial class MainForm : Form
     {
-        // Needed For Hotkey
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-        private const int WM_HOTKEY = 0x0312;
-        private int hotkeyId = 1;
-        private const uint MOD_CONTROL = 0x0002;
-        private const uint MOD_SHIFT = 0x0004;
-        private const uint MOD_ALT = 0x0001;
-
         // Instances & Variables
         private Version version = Assembly.GetExecutingAssembly().GetName().Version;
         private string versionFormatted;
+        private BackgroundHandler backgroundHandler;
+        private Hotkeys hotkeys;
+        private RawInput rawInput;
         private AboutForm aboutForm;
+        private AutoProcessEnable autoProcessEnable;
         private ProcessEditorForm processEditorForm;
         private QuickProcessAddForm quickProcessAddForm;
+        private Form hiddenForm;
         private HashSet<Keys> pressedKeys = new HashSet<Keys>();
-        private Screen lockedScreen = null;
-        private bool isRunning = false;
-        private bool isMouseLockedByApp = false;
-        private bool forceClose = false;
-
-        // Raw Input API
-        [DllImport("user32.dll")]
-        static extern bool RegisterRawInputDevices(RAWINPUTDEVICE[] pRawInputDevices, uint uiNumDevices, uint cbSize);
-
-        private const int WM_INPUT = 0x00FF;
-        private const int RIM_TYPEMOUSE = 0;
-        private const int RID_INPUT = 0x10000003;
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct RAWINPUTHEADER
-        {
-            public uint dwType;
-            public uint dwSize;
-            public IntPtr hDevice;
-            public IntPtr wParam;
-        }
-
-        [StructLayout(LayoutKind.Explicit)]
-        public struct RAWMOUSE
-        {
-            [FieldOffset(0)] public ushort usFlags;
-            [FieldOffset(4)] public uint ulButtons;
-            [FieldOffset(4)] public ushort usButtonFlags;
-            [FieldOffset(6)] public ushort usButtonData;
-            [FieldOffset(8)] public uint ulRawButtons;
-            [FieldOffset(12)] public int lLastX;
-            [FieldOffset(16)] public int lLastY;
-            [FieldOffset(20)] public uint ulExtraInformation;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct RAWINPUT
-        {
-            public RAWINPUTHEADER header;
-            public RAWMOUSE mouse;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct RAWINPUTDEVICE
-        {
-            public ushort usUsagePage;
-            public ushort usUsage;
-            public uint dwFlags;
-            public IntPtr hwndTarget;
-        }
-        // ---
+        public Screen lockedScreen = null;
+        public bool isRunning = false;
+        public bool isMouseLockedByApp = false;
+        public bool forceClose = false;
 
         // MainForm Initialization
         public MainForm()
         {
             InitializeComponent();
+            rawInput = new RawInput(this);
+            hotkeys = new Hotkeys(this);
+            backgroundHandler = new BackgroundHandler(this, hotkeys, rawInput);
+            autoProcessEnable = new AutoProcessEnable(this);
         }
 
         // MainForm Closed Event
@@ -112,12 +61,6 @@ namespace Mouse_Mender
             {
                 // Default - Open in Last Location
                 this.Location = Properties.Settings.Default.LastWindowLocation;
-            }
-
-            // Register Hotkey (if enabled)
-            if (Properties.Settings.Default.EnableHotkeys)
-            {
-                UpdateHotkeyRegistration();
             }
 
             // Start Auto Enable If Selected
@@ -210,6 +153,22 @@ namespace Mouse_Mender
             label7.Text = "Mouse Mender v" + versionFormatted; // Version Label
         }
 
+        // MainForm Show Event
+        private void MainForm_Shown(object sender, EventArgs e)
+        {
+            // Register Hotkey (if enabled)
+            if (Properties.Settings.Default.EnableHotkeys)
+            {
+                hotkeys.UpdateHotkeyRegistration();
+            }
+        }
+
+        // Set Hidden Form Instance - MainForm Show Event Helper
+        public void SetHiddenForm(Form HiddenForm)
+        {
+            hiddenForm = HiddenForm;
+        }
+
         // MainForm FormClosing Event
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
@@ -227,7 +186,7 @@ namespace Mouse_Mender
                 Properties.Settings.Default.Save();
 
                 // --Necessary cleanup if closing--
-                UnregisterHotKey(this.Handle, hotkeyId);
+                Hotkeys.UnregisterHotKey(this.Handle, hotkeys.hotkeyId);
             }
         }
 
@@ -254,65 +213,20 @@ namespace Mouse_Mender
             return false;
         }
 
-        // ---System Tray---
-
-        // Icon Double Click
-        private void notifyIcon1_MouseDoubleClick(object sender, MouseEventArgs e)
-        {
-            this.Show();
-            this.WindowState = FormWindowState.Normal;
-            this.ShowInTaskbar = true;
-            this.Activate();
-        }
+        // ---Top Menu Bar---
 
         // Toggle Mouse Lock
         private void enableMouseMenderToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (isRunning)
             {
-                unlockMouse();
+                rawInput.unlockMouse();
             }
             else
             {
-                LockMouse();
+                rawInput.LockMouse();
             }
         }
-
-        // Toggle Hotkeys
-        private void enableHotkeysToolStripMenuItem1_Click(object sender, EventArgs e)
-        {
-            if (enableHotkeysToolStripMenuItem1.Checked)
-            {
-                Properties.Settings.Default.EnableHotkeys = true;
-                Properties.Settings.Default.Save();
-
-                label9.Text = "Enabled";            // Label
-                label9.ForeColor = Color.DarkGreen;
-                enableHotkeysToolStripMenuItem1.Checked = true; // Systray
-
-                UpdateHotkeyRegistration(); // Enable Hotkey
-            }
-            else
-            {
-                Properties.Settings.Default.EnableHotkeys = false;
-                Properties.Settings.Default.Save();
-
-                label9.Text = "Disabled";            // Label
-                label9.ForeColor = Color.DarkRed;
-                enableHotkeysToolStripMenuItem1.Checked = false; // Systray
-
-                UnregisterHotKey(this.Handle, hotkeyId); // Disable Current Hotkey
-            }
-        }
-
-        // Exit Application
-        private void exitToolStripMenuItem1_Click(object sender, EventArgs e)
-        {
-            forceClose = true;
-            Application.Exit();
-        }
-
-        // ---Tool Strip---
 
         // Re-launch Button
         private void relaunchToolStripMenuItem_Click(object sender, EventArgs e)
@@ -339,7 +253,7 @@ namespace Mouse_Mender
                 label11.Text = "Enabled";         // Label
                 label11.ForeColor = Color.DarkGreen;
 
-                EnableAutoEnable();
+                autoProcessEnable.EnableAutoEnable();
             }
             else
             {
@@ -349,7 +263,7 @@ namespace Mouse_Mender
                 label11.Text = "Disabled";         // Label
                 label11.ForeColor = Color.DarkRed;
 
-                DisableAutoEnable();
+                autoProcessEnable.DisableAutoEnable();
             }
         }
 
@@ -447,19 +361,22 @@ namespace Mouse_Mender
             }
         }
 
-        // Enable Hotkeys
+        // Toggle Hotkeys
         private void enableHotkeysToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (enableHotkeysToolStripMenuItem.Checked)
+            if (!Properties.Settings.Default.EnableHotkeys)
             {
                 Properties.Settings.Default.EnableHotkeys = true;
                 Properties.Settings.Default.Save();
 
                 label9.Text = "Enabled";            // Label
                 label9.ForeColor = Color.DarkGreen;
+
+                enableHotkeysToolStripMenuItem.Checked = true; // Top bar
+
                 enableHotkeysToolStripMenuItem1.Checked = true; // Systray
 
-                UpdateHotkeyRegistration(); // Enable Hotkey
+                hotkeys.UpdateHotkeyRegistration(); // Enable Hotkey
             }
             else
             {
@@ -468,9 +385,12 @@ namespace Mouse_Mender
 
                 label9.Text = "Disabled";            // Label
                 label9.ForeColor = Color.DarkRed;
+
+                enableHotkeysToolStripMenuItem.Checked = false; // Top bar
+
                 enableHotkeysToolStripMenuItem1.Checked = false; // Systray
 
-                UnregisterHotKey(this.Handle, hotkeyId); // Disable Current Hotkey
+                Hotkeys.UnregisterHotKey(hiddenForm.Handle, hotkeys.hotkeyId); // Disable Current Hotkey
             }
         }
 
@@ -486,16 +406,80 @@ namespace Mouse_Mender
 
                 // Open AboutForm
                 aboutForm = new AboutForm();
-                aboutForm.Show();
+                Show();
 
                 // Subscribe to the about form FormClosed event
-                aboutForm.FormClosed += (s, args) => aboutForm = null;
+                FormClosed += (s, args) => aboutForm = null;
             }
             else
             {
                 // If the about form exists already bring the existing form to the front
-                aboutForm.BringToFront();
+                BringToFront();
             }
+        }
+
+        // ---System Tray---
+
+        // Icon Double Click
+        private void notifyIcon1_MouseDoubleClick(object sender, MouseEventArgs e)
+        {
+            this.Show();
+            this.WindowState = FormWindowState.Normal;
+            this.ShowInTaskbar = true;
+            this.Activate();
+        }
+
+        // Toggle Mouse Lock
+        private void enableMouseMenderToolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            if (isRunning)
+            {
+                rawInput.unlockMouse();
+            }
+            else
+            {
+                rawInput.LockMouse();
+            }
+        }
+
+        // Toggle Hotkeys
+        private void enableHotkeysToolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            if (!Properties.Settings.Default.EnableHotkeys)
+            {
+                Properties.Settings.Default.EnableHotkeys = true;
+                Properties.Settings.Default.Save();
+
+                label9.Text = "Enabled";            // Label
+                label9.ForeColor = Color.DarkGreen;
+
+                enableHotkeysToolStripMenuItem.Checked = true; // Top bar
+
+                enableHotkeysToolStripMenuItem1.Checked = true; // Systray
+
+                hotkeys.UpdateHotkeyRegistration(); // Enable Hotkey
+            }
+            else
+            {
+                Properties.Settings.Default.EnableHotkeys = false;
+                Properties.Settings.Default.Save();
+
+                label9.Text = "Disabled";            // Label
+                label9.ForeColor = Color.DarkRed;
+
+                enableHotkeysToolStripMenuItem.Checked = false; // Top bar
+
+                enableHotkeysToolStripMenuItem1.Checked = false; // Systray
+
+                Hotkeys.UnregisterHotKey(hiddenForm.Handle, hotkeys.hotkeyId); // Disable Current Hotkey
+            }
+        }
+
+        // Exit Application
+        private void exitToolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            forceClose = true;
+            Application.Exit();
         }
 
         // ---Main Functions---
@@ -505,140 +489,15 @@ namespace Mouse_Mender
         {
             if (isRunning)
             {
-                unlockMouse();
+                rawInput.unlockMouse();
             }
             else
             {
-                LockMouse();
+                rawInput.LockMouse();
             }
 
             groupBox1.Focus(); // Prevent unwanted focuses
         }
-
-        // Lock Mouse
-        private void LockMouse()
-        {
-            isRunning = true;
-            lockedScreen = GetTargetMonitor();
-
-            // Set UI
-            label2.Text = "Enabled";
-            label2.ForeColor = Color.DarkGreen;
-            button1.Text = "Disable Mouse Lock";
-
-            // Set Systray
-            statusDisabledToolStripMenuItem.Text = "Enabled";
-            enableMouseMenderToolStripMenuItem.Text = "Disable Mouse Lock";
-
-            // Lock Mouse
-            RegisterMouseForRawInput();  // Start capturing raw input
-
-        }
-
-        // Unlock Mouse
-        private void unlockMouse()
-        {
-            isRunning = false;
-            lockedScreen = null;
-
-            // Set UI
-            label2.Text = "Disabled";
-            label2.ForeColor = Color.DarkRed;
-            button1.Text = "Enable Mouse Lock";
-
-            // Set Systray
-            statusDisabledToolStripMenuItem.Text = "Disabled";
-            enableMouseMenderToolStripMenuItem.Text = "Enable Mouse Lock";
-
-            // Unlock Mouse
-            UnregisterMouseForRawInput();  // Stop capturing raw input
-        }
-
-        // Get Screen Based On Preference
-        private Screen GetTargetMonitor()
-        {
-            var monitorPreference = Properties.Settings.Default.MonitorPreference;
-            if (monitorPreference == "CurrentMonitorWithMouse")
-            {
-                Point cursorPos = Cursor.Position;
-                return Screen.FromPoint(cursorPos); // Get the current screen where the mouse cursor is located
-            }
-            else if (monitorPreference == "PrimaryMonitor")
-            {
-                return Screen.PrimaryScreen; // Get the primary screen
-            }
-            return null;
-        }
-
-        // ---Raw Input API---
-
-        // Register Raw Inputs
-        private void RegisterMouseForRawInput()
-        {
-            RAWINPUTDEVICE[] rid = new RAWINPUTDEVICE[1];
-            rid[0].usUsagePage = 0x01; // Usage page for Generic Desktop Controls
-            rid[0].usUsage = 0x02; // Usage for Mouse
-            rid[0].dwFlags = 0x00000100; // RIDEV_INPUTSINK; to receive system-wide events
-            rid[0].hwndTarget = this.Handle; // follows keyboard focus
-
-            if (!RegisterRawInputDevices(rid, (uint)rid.Length, (uint)Marshal.SizeOf(rid[0])))
-            {
-                throw new ApplicationException("Failed to register raw input device(s).");
-            }
-        }
-
-        // Unregister Raw Inputs
-        private void UnregisterMouseForRawInput()
-        {
-            RAWINPUTDEVICE[] rid = new RAWINPUTDEVICE[1];
-            rid[0].usUsagePage = 0x01;  // Usage page for Generic Desktop Controls
-            rid[0].usUsage = 0x02;      // Usage for Mouse
-            rid[0].dwFlags = 0x00000001; // RIDEV_REMOVE: Specifies the topmost removal of the device
-            rid[0].hwndTarget = IntPtr.Zero;
-
-            if (!RegisterRawInputDevices(rid, (uint)rid.Length, (uint)Marshal.SizeOf(rid[0])))
-            {
-                throw new ApplicationException("Failed to unregister raw input device(s).");
-            }
-        }
-
-        [DllImport("user32.dll")]
-        static extern int GetRawInputData(IntPtr hRawInput, uint uiCommand, out RAWINPUT pData, ref uint pcbSize, uint cbSizeHeader);
-
-        // Handle Raw Inputs
-        private void HandleRawInput(IntPtr lParam)
-        {
-            uint dwSize = 0;
-            GetRawInputData(lParam, RID_INPUT, out RAWINPUT input, ref dwSize, (uint)Marshal.SizeOf(typeof(RAWINPUTHEADER)));
-
-            if (input.header.dwType == RIM_TYPEMOUSE && isRunning)
-            {
-                Point currentPos = Cursor.Position;
-                Point newPos = new Point(currentPos.X + input.mouse.lLastX, currentPos.Y + input.mouse.lLastY);
-
-                // Check if the new position is within the bounds of the locked screen
-                if (!IsCursorWithinTargetMonitor(newPos))
-                {
-                    Cursor.Position = ClampToScreen(newPos, lockedScreen.Bounds);
-                }
-            }
-        }
-
-        // Check if Cursor is in monitor
-        private bool IsCursorWithinTargetMonitor(Point position)
-        {
-            Screen targetMonitor = GetTargetMonitor();
-            return targetMonitor.Bounds.Contains(position);
-        }
-
-        // Helper method to clamp the cursor position within the screen bounds
-        private Point ClampToScreen(Point position, Rectangle bounds)
-        {
-            int x = Math.Max(bounds.Left, Math.Min(bounds.Right - 1, position.X));
-            int y = Math.Max(bounds.Top, Math.Min(bounds.Bottom - 1, position.Y));
-            return new Point(x, y);
-        }
-
 
         // ---Hotkeys--
 
@@ -695,12 +554,12 @@ namespace Mouse_Mender
             // Handle special cases for Enter and Escape
             if (e.KeyCode == Keys.Return)
             {
-                SaveHotkey();
+                hotkeys.SaveHotkey();
                 e.SuppressKeyPress = true;  // Suppress further processing
             }
             else if (e.KeyCode == Keys.Escape)
             {
-                RestorePreviousHotkey();
+                hotkeys.RestorePreviousHotkey();
                 e.SuppressKeyPress = true;  // Suppress further processing
             }
         }
@@ -711,158 +570,10 @@ namespace Mouse_Mender
             pressedKeys.Remove(e.KeyCode);
         }
 
-        // Save New Hotkey
-        private void SaveHotkey()
-        {
-            Properties.Settings.Default.Hotkey = textBox1.Text;
-            Properties.Settings.Default.Save();
-
-            // Update Registered Hotkey
-            if (Properties.Settings.Default.EnableHotkeys)
-            {
-                UpdateHotkeyRegistration();
-            }
-
-            // Shift focus to prevent re-editing
-            groupBox1.Focus();
-        }
-
-        // Restore Current Hotkey
-        private void RestorePreviousHotkey()
-        {
-            textBox1.Text = Properties.Settings.Default.Hotkey;
-
-            // Shift focus to prevent re-editing
-            groupBox1.Focus();
-        }
-
-        // Parsing Hotkey String
-        private uint ParseModifiers(string modifiers)
-        {
-            uint modifierKeys = 0;
-            if (modifiers.Contains("Ctrl"))
-                modifierKeys |= MOD_CONTROL;
-            if (modifiers.Contains("Alt"))
-                modifierKeys |= MOD_ALT;
-            if (modifiers.Contains("Shift"))
-                modifierKeys |= MOD_SHIFT;
-            return modifierKeys;
-        }
-
-        private Keys ParseKey(string key)
-        {
-            return (Keys)Enum.Parse(typeof(Keys), key);
-        }
-
-        // Register Hotkey
-        private void UpdateHotkeyRegistration()
-        {
-            string hotkeyText = Properties.Settings.Default.Hotkey;
-            var parts = hotkeyText.Split('+').Select(p => p.Trim()).ToArray();
-            uint modifiers = ParseModifiers(parts[0]);  // Assuming the first part is always modifiers
-            Keys key = ParseKey(parts.Length > 1 ? parts[1] : "");
-
-            // Unregister the previous hotkey if registered
-            UnregisterHotKey(this.Handle, hotkeyId);
-            // Register the new hotkey
-            RegisterHotKey(this.Handle, hotkeyId, modifiers, (uint)key);
-        }
-
-        // ---WindProc---
-
-        // Hotkey Pressed & Mouse Inputs
-        protected override void WndProc(ref Message m)
-        {
-            base.WndProc(ref m);
-
-            switch (m.Msg)
-            {
-                case WM_HOTKEY:
-                    if ((int)m.WParam == hotkeyId)
-                    {
-                        // Toggle Mouse lock
-                        if (isRunning)
-                        {
-                            unlockMouse();
-                        }
-                        else
-                        {
-                            LockMouse();
-                        }
-                    }
-                    break;
-
-                case WM_INPUT:
-                    HandleRawInput(m.LParam);
-                    break;
-            }
-        }
-
-        // ---Auto Process---
-
-        // Auto Enable Enabled
-        private void EnableAutoEnable()
-        {
-            // Check if the AutoEnableProcessList has processes
-            if (Properties.Settings.Default.AutoEnable && Properties.Settings.Default.AutoEnableProcessList != null && Properties.Settings.Default.AutoEnableProcessList.Count > 0)
-            {
-                // Start Auto Enable checking
-                checkProcessTimer.Start();
-            }
-            else
-            {
-                // Set Setting back to Disabled
-                Properties.Settings.Default.AutoEnable = false;
-                Properties.Settings.Default.Save();
-
-                // Set UI back to Disabled
-                enableAutoEnableToolStripMenuItem.Checked = false;
-                label11.Text = "Disabled";
-                label11.ForeColor = Color.DarkRed;
-
-                // Error for no processes in list to check
-                MessageBox.Show("To use Auto Enable please add at least 1 process to the process list.", "Mouse Mender - Process List Empty", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
-
-        // Auto Enable Disabled
-        private void DisableAutoEnable()
-        {
-            if (checkProcessTimer != null)
-            {
-                checkProcessTimer.Stop();
-                checkProcessTimer.Dispose();
-                checkProcessTimer = null;
-            }
-        }
-
-        // Restart Auto Enable
-        public void RestartAutoEnableTimer()
-        {
-            if (Properties.Settings.Default.AutoEnable)
-            {
-                if (checkProcessTimer != null)
-                {
-                    checkProcessTimer.Stop();
-                    checkProcessTimer.Start(); // Restart the timer
-                }
-            }
-        }
-
-        // Check for Process & Process Closed
+        // Auto Enable Timer Tick
         private void checkProcessTimer_Tick(object sender, EventArgs e)
         {
-            bool processFound = Properties.Settings.Default.AutoEnableProcessList.Cast<string>().Any(process => Process.GetProcessesByName(process.Replace(".exe", "")).Length > 0);
-            if (processFound && !isMouseLockedByApp)
-            {
-                LockMouse();
-                isMouseLockedByApp = true;
-            }
-            else if (!processFound && isMouseLockedByApp)
-            {
-                unlockMouse();
-                isMouseLockedByApp = false;
-            }
+            autoProcessEnable.CheckForProcesses(rawInput);
         }
 
         // ---Bottom Info Bar---

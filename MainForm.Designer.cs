@@ -477,7 +477,7 @@
             enableMouseMenderToolStripMenuItem.Name = "enableMouseMenderToolStripMenuItem";
             enableMouseMenderToolStripMenuItem.Size = new Size(176, 22);
             enableMouseMenderToolStripMenuItem.Text = "Enable Mouse Lock";
-            enableMouseMenderToolStripMenuItem.Click += enableMouseMenderToolStripMenuItem_Click;
+            enableMouseMenderToolStripMenuItem.Click += enableMouseMenderToolStripMenuItem1_Click;
             // 
             // enableHotkeysToolStripMenuItem1
             // 
@@ -497,7 +497,6 @@
             exitToolStripMenuItem1.Name = "exitToolStripMenuItem1";
             exitToolStripMenuItem1.Size = new Size(176, 22);
             exitToolStripMenuItem1.Text = "Exit";
-            exitToolStripMenuItem1.Click += exitToolStripMenuItem1_Click;
             // 
             // checkProcessTimer
             // 
@@ -525,6 +524,7 @@
             FormClosing += MainForm_FormClosing;
             FormClosed += MainForm_FormClosed;
             Load += MainForm_Load;
+            Shown += MainForm_Shown;
             LocationChanged += MainForm_LocationChanged;
             topmenuStrip.ResumeLayout(false);
             topmenuStrip.PerformLayout();
@@ -542,55 +542,54 @@
         }
 
         #endregion
-
-        private MenuStrip topmenuStrip;
         private ToolStripMenuItem fileToolStripMenuItem;
         private ToolStripMenuItem relaunchToolStripMenuItem;
         private ToolStripSeparator toolStripSeparator1;
         private ToolStripMenuItem exitToolStripMenuItem;
         private ToolStripMenuItem monitorPreferenceToolStripMenuItem;
         private ToolStripMenuItem settingsToolStripMenuItem;
-        private ToolStripMenuItem currentMonitorWithMouseToolStripMenuItem;
-        private ToolStripMenuItem primaryMonitorToolStripMenuItem;
-        private ToolStripMenuItem checkForUpdatesOnLaunchToolStripMenuItem;
         private ToolStripSeparator toolStripSeparator2;
-        private ToolStripMenuItem exitToSystrayToolStripMenuItem;
-        private ToolStripMenuItem enableHotkeysToolStripMenuItem;
         private Label label1;
-        private GroupBox groupBox1;
-        private Label label2;
         private GroupBox groupBox2;
         private GroupBox groupBox3;
         private Label label5;
         private Label label4;
-        private TextBox textBox1;
         private Label label3;
-        private Button button1;
         private GroupBox groupBox4;
         private Label label7;
         private Label label6;
-        private NotifyIcon systrayIcon;
-        private ContextMenuStrip systrayMenuStrip;
-        private ToolStripMenuItem enableMouseMenderToolStripMenuItem;
         private ToolStripSeparator toolStripSeparator3;
-        private ToolStripMenuItem exitToolStripMenuItem1;
         private ToolStripMenuItem mouseMenderToolStripMenuItem;
         private ToolStripSeparator toolStripSeparator4;
-        private ToolStripMenuItem statusDisabledToolStripMenuItem;
-        private ToolStripMenuItem enableHotkeysToolStripMenuItem1;
         private ToolStripSeparator toolStripSeparator5;
         private ToolStripMenuItem aboutMouseMenderToolStripMenuItem;
         private ToolStripMenuItem autoEnableToolStripMenuItem;
-        private ToolStripMenuItem enableAutoEnableToolStripMenuItem;
         private ToolStripSeparator toolStripSeparator6;
         private ToolStripMenuItem processListEditorToolStripMenuItem;
         private ToolStripMenuItem quickAddProcessToolStripMenuItem;
-        private Label label11;
         private Label label10;
-        private Label label9;
         private Label label8;
         private Label label13;
         private Label label12;
-        private System.Windows.Forms.Timer checkProcessTimer;
+        public ToolStripMenuItem currentMonitorWithMouseToolStripMenuItem;
+        public ToolStripMenuItem primaryMonitorToolStripMenuItem;
+        public ToolStripMenuItem checkForUpdatesOnLaunchToolStripMenuItem;
+        public ToolStripMenuItem exitToSystrayToolStripMenuItem;
+        public ToolStripMenuItem enableHotkeysToolStripMenuItem;
+        public Label label2;
+        public TextBox textBox1;
+        public Button button1;
+        public ToolStripMenuItem enableAutoEnableToolStripMenuItem;
+        public Label label11;
+        public Label label9;
+        public System.Windows.Forms.Timer checkProcessTimer;
+        public MenuStrip topmenuStrip;
+        public GroupBox groupBox1;
+        public ContextMenuStrip systrayMenuStrip;
+        public ToolStripMenuItem enableMouseMenderToolStripMenuItem;
+        public ToolStripMenuItem exitToolStripMenuItem1;
+        public ToolStripMenuItem statusDisabledToolStripMenuItem;
+        public ToolStripMenuItem enableHotkeysToolStripMenuItem1;
+        public NotifyIcon systrayIcon;
     }
 }
