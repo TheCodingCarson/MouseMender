@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using Mouse_Mender.Modules;
 
@@ -6,11 +7,13 @@ namespace Mouse_Mender
     public partial class MainForm : Form
     {
         // Instances & Variables
+        private string codingcarsonURL = "https://www.youtube.com/@CodingCarson";
         private Version version = Assembly.GetExecutingAssembly().GetName().Version;
         private string versionFormatted;
         private BackgroundHandler backgroundHandler;
         private Hotkeys hotkeys;
         private RawInput rawInput;
+        private UpdateChecker updateChecker;
         private AboutForm aboutForm;
         private AutoProcessEnable autoProcessEnable;
         private ProcessEditorForm processEditorForm;
@@ -26,6 +29,7 @@ namespace Mouse_Mender
         public MainForm()
         {
             InitializeComponent();
+            updateChecker = new UpdateChecker();
             rawInput = new RawInput(this);
             hotkeys = new Hotkeys(this);
             backgroundHandler = new BackgroundHandler(this, hotkeys, rawInput);
@@ -160,6 +164,12 @@ namespace Mouse_Mender
             if (Properties.Settings.Default.EnableHotkeys)
             {
                 hotkeys.UpdateHotkeyRegistration();
+            }
+
+            // Check For Updates (if enabled)
+            if (Properties.Settings.Default.CheckForUpdatesonLaunch)
+            {
+                updateChecker.CheckForUpdates();
             }
         }
 
@@ -334,13 +344,21 @@ namespace Mouse_Mender
         // Check for Updates On Launch
         private void checkForUpdatesOnLaunchToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (exitToSystrayToolStripMenuItem.Checked)
+            if (!Properties.Settings.Default.CheckForUpdatesonLaunch)
             {
+                // Set UI
+                checkForUpdatesOnLaunchToolStripMenuItem.Checked = true;
+
+                // Save to Settings
                 Properties.Settings.Default.CheckForUpdatesonLaunch = true;
                 Properties.Settings.Default.Save();
             }
             else
             {
+                // Set UI
+                checkForUpdatesOnLaunchToolStripMenuItem.Checked = false;
+
+                // Save to Settings
                 Properties.Settings.Default.CheckForUpdatesonLaunch = false;
                 Properties.Settings.Default.Save();
             }
@@ -578,10 +596,18 @@ namespace Mouse_Mender
 
         // ---Bottom Info Bar---
 
-        // Click "Made By CodingCarson" label
+        // Click "Made By CodingCarson" label - Open To CodingCarson Youtube Channel
         private void label6_Click(object sender, EventArgs e)
         {
-
+            try
+            {
+                Process.Start(new ProcessStartInfo("cmd", $"/c start {codingcarsonURL.Replace("&", "^&")}") { CreateNoWindow = true });
+            }
+            catch (Exception ex)
+            {
+                // Log error
+                Debug.WriteLine("ERROR: Could not open the URL: " + ex.Message);
+            }
         }
 
     }
