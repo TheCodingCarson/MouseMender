@@ -2,6 +2,9 @@
 {
     public partial class ProcessEditorForm : Form
     {
+        // Declared Variables
+        private MainForm mainForm;
+
         public ProcessEditorForm()
         {
             InitializeComponent();
@@ -61,6 +64,9 @@
 
                 // Clear textbox
                 textBox1.Clear();
+
+                // Reset Auto Enable in MainForm
+                mainForm.RestartAutoEnableTimer();
             }
             else
             {
@@ -80,6 +86,9 @@
 
                 // Remove from the ListBox
                 listBox1.Items.RemoveAt(listBox1.SelectedIndex);
+
+                // Reset Auto Enable in MainForm
+                mainForm.RestartAutoEnableTimer();
             }
         }
 
