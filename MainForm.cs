@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using System.Reflection;
+using System.Diagnostics;
 
 namespace Mouse_Mender
 {
@@ -27,6 +28,7 @@ namespace Mouse_Mender
         private Screen lockedScreen = null;
         private bool resolutionChange = false;
         private bool isRunning = false;
+        private bool isMouseLockedByApp = false;
         private bool forceClose = false;
 
         // MainForm Initialization
@@ -71,6 +73,24 @@ namespace Mouse_Mender
             if (Properties.Settings.Default.EnableHotkeys)
             {
                 UpdateHotkeyRegistration();
+            }
+
+            // Start Auto Enable If Selected
+            if (Properties.Settings.Default.AutoEnable && Properties.Settings.Default.AutoEnableProcessList != null && Properties.Settings.Default.AutoEnableProcessList.Count > 0)
+            {
+                // Start Auto Enable checking
+                checkProcessTimer.Start();
+            }
+            else
+            {
+                // Set Setting back to Disabled
+                Properties.Settings.Default.AutoEnable = false;
+                Properties.Settings.Default.Save();
+
+                // Set UI back to Disabled
+                enableAutoEnableToolStripMenuItem.Checked = false;
+                label11.Text = "Disabled";
+                label11.ForeColor = Color.DarkRed;
             }
 
             // Load UI Properties From Settings
@@ -141,7 +161,7 @@ namespace Mouse_Mender
             textBox1.Text = Properties.Settings.Default.Hotkey; // Hotkey
 
             versionFormatted = $"{version.Major}.{version.Minor}.{version.Build}"; // Format Version String
-            
+
             label7.Text = "Mouse Mender v" + versionFormatted; // Version Label
         }
 
@@ -201,7 +221,47 @@ namespace Mouse_Mender
             this.Activate();
         }
 
-        // Exit Button
+        // Toggle Mouse Lock
+        private void enableMouseMenderToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (isRunning)
+            {
+                unlockMouse();
+            }
+            else
+            {
+                LockMouse();
+            }
+        }
+
+        // Toggle Hotkeys
+        private void enableHotkeysToolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            if (enableHotkeysToolStripMenuItem1.Checked)
+            {
+                Properties.Settings.Default.EnableHotkeys = true;
+                Properties.Settings.Default.Save();
+
+                label9.Text = "Enabled";            // Label
+                label9.ForeColor = Color.DarkGreen;
+                enableHotkeysToolStripMenuItem1.Checked = true; // Systray
+
+                UpdateHotkeyRegistration(); // Enable Hotkey
+            }
+            else
+            {
+                Properties.Settings.Default.EnableHotkeys = false;
+                Properties.Settings.Default.Save();
+
+                label9.Text = "Disabled";            // Label
+                label9.ForeColor = Color.DarkRed;
+                enableHotkeysToolStripMenuItem1.Checked = false; // Systray
+
+                UnregisterHotKey(this.Handle, hotkeyId); // Disable Current Hotkey
+            }
+        }
+
+        // Exit Application
         private void exitToolStripMenuItem1_Click(object sender, EventArgs e)
         {
             forceClose = true;
@@ -234,6 +294,8 @@ namespace Mouse_Mender
 
                 label11.Text = "Enabled";         // Label
                 label11.ForeColor = Color.DarkGreen;
+
+                EnableAutoEnable();
             }
             else
             {
@@ -242,6 +304,8 @@ namespace Mouse_Mender
 
                 label11.Text = "Disabled";         // Label
                 label11.ForeColor = Color.DarkRed;
+
+                DisableAutoEnable();
             }
         }
 
@@ -458,7 +522,7 @@ namespace Mouse_Mender
                 // Set Systray
                 statusDisabledToolStripMenuItem.Text = "Disabled";
                 enableMouseMenderToolStripMenuItem.Text = "Enable Mouse Lock";
-            }           
+            }
 
             // Unlock Mouse
             ClipCursor(IntPtr.Zero);
@@ -651,6 +715,73 @@ namespace Mouse_Mender
             }
         }
 
+        // ---Auto Process---
+
+        // Auto Enable Enabled
+        private void EnableAutoEnable()
+        {
+            // Check if the AutoEnableProcessList has processes
+            if (Properties.Settings.Default.AutoEnable && Properties.Settings.Default.AutoEnableProcessList != null && Properties.Settings.Default.AutoEnableProcessList.Count > 0)
+            {
+                // Start Auto Enable checking
+                checkProcessTimer.Start();
+            }
+            else
+            {
+                // Set Setting back to Disabled
+                Properties.Settings.Default.AutoEnable = false;
+                Properties.Settings.Default.Save();
+
+                // Set UI back to Disabled
+                enableAutoEnableToolStripMenuItem.Checked = false;
+                label11.Text = "Disabled";
+                label11.ForeColor = Color.DarkRed;
+
+                // Error for no processes in list to check
+                MessageBox.Show("To use Auto Enable please add at least 1 process to the process list.", "Mouse Mender - Process List Empty", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // Auto Enable Disabled
+        private void DisableAutoEnable()
+        {
+            if (checkProcessTimer != null)
+            {
+                checkProcessTimer.Stop();
+                checkProcessTimer.Dispose();
+                checkProcessTimer = null;
+            }
+        }
+
+        // Restart Auto Enable
+        public void RestartAutoEnableTimer()
+        {
+            if (Properties.Settings.Default.AutoEnable)
+            {
+                if (checkProcessTimer != null)
+                {
+                    checkProcessTimer.Stop();
+                    checkProcessTimer.Start(); // Restart the timer
+                }
+            }
+        }
+
+        // Check for Process & Process Closed
+        private void checkProcessTimer_Tick(object sender, EventArgs e)
+        {
+            bool processFound = Properties.Settings.Default.AutoEnableProcessList.Cast<string>().Any(process => Process.GetProcessesByName(process.Replace(".exe", "")).Length > 0);
+            if (processFound && !isMouseLockedByApp)
+            {
+                LockMouse();
+                isMouseLockedByApp = true;
+            }
+            else if (!processFound && isMouseLockedByApp)
+            {
+                unlockMouse();
+                isMouseLockedByApp = false;
+            }
+        }
+
         // ---Bottom Info Bar---
 
         // Click "Made By CodingCarson" label
@@ -658,5 +789,6 @@ namespace Mouse_Mender
         {
 
         }
+
     }
 }

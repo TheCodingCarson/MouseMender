@@ -78,6 +78,7 @@
             enableHotkeysToolStripMenuItem1 = new ToolStripMenuItem();
             toolStripSeparator4 = new ToolStripSeparator();
             exitToolStripMenuItem1 = new ToolStripMenuItem();
+            checkProcessTimer = new System.Windows.Forms.Timer(components);
             topmenuStrip.SuspendLayout();
             groupBox1.SuspendLayout();
             groupBox2.SuspendLayout();
@@ -476,6 +477,7 @@
             enableMouseMenderToolStripMenuItem.Name = "enableMouseMenderToolStripMenuItem";
             enableMouseMenderToolStripMenuItem.Size = new Size(176, 22);
             enableMouseMenderToolStripMenuItem.Text = "Enable Mouse Lock";
+            enableMouseMenderToolStripMenuItem.Click += enableMouseMenderToolStripMenuItem_Click;
             // 
             // enableHotkeysToolStripMenuItem1
             // 
@@ -483,6 +485,7 @@
             enableHotkeysToolStripMenuItem1.Name = "enableHotkeysToolStripMenuItem1";
             enableHotkeysToolStripMenuItem1.Size = new Size(176, 22);
             enableHotkeysToolStripMenuItem1.Text = "Enable Hotkeys";
+            enableHotkeysToolStripMenuItem1.Click += enableHotkeysToolStripMenuItem1_Click;
             // 
             // toolStripSeparator4
             // 
@@ -495,6 +498,11 @@
             exitToolStripMenuItem1.Size = new Size(176, 22);
             exitToolStripMenuItem1.Text = "Exit";
             exitToolStripMenuItem1.Click += exitToolStripMenuItem1_Click;
+            // 
+            // checkProcessTimer
+            // 
+            checkProcessTimer.Interval = 1000;
+            checkProcessTimer.Tick += checkProcessTimer_Tick;
             // 
             // MainForm
             // 
@@ -583,5 +591,6 @@
         private Label label8;
         private Label label13;
         private Label label12;
+        private System.Windows.Forms.Timer checkProcessTimer;
     }
 }
