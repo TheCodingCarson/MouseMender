@@ -26,16 +26,61 @@ namespace Mouse_Mender
         private QuickProcessAddForm quickProcessAddForm;
         private HashSet<Keys> pressedKeys = new HashSet<Keys>();
         private Screen lockedScreen = null;
-        private bool resolutionChange = false;
         private bool isRunning = false;
         private bool isMouseLockedByApp = false;
         private bool forceClose = false;
+
+        // Raw Input API
+        [DllImport("user32.dll")]
+        static extern bool RegisterRawInputDevices(RAWINPUTDEVICE[] pRawInputDevices, uint uiNumDevices, uint cbSize);
+
+        private const int WM_INPUT = 0x00FF;
+        private const int RIM_TYPEMOUSE = 0;
+        private const int RID_INPUT = 0x10000003;
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RAWINPUTHEADER
+        {
+            public uint dwType;
+            public uint dwSize;
+            public IntPtr hDevice;
+            public IntPtr wParam;
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        public struct RAWMOUSE
+        {
+            [FieldOffset(0)] public ushort usFlags;
+            [FieldOffset(4)] public uint ulButtons;
+            [FieldOffset(4)] public ushort usButtonFlags;
+            [FieldOffset(6)] public ushort usButtonData;
+            [FieldOffset(8)] public uint ulRawButtons;
+            [FieldOffset(12)] public int lLastX;
+            [FieldOffset(16)] public int lLastY;
+            [FieldOffset(20)] public uint ulExtraInformation;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RAWINPUT
+        {
+            public RAWINPUTHEADER header;
+            public RAWMOUSE mouse;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RAWINPUTDEVICE
+        {
+            public ushort usUsagePage;
+            public ushort usUsage;
+            public uint dwFlags;
+            public IntPtr hwndTarget;
+        }
+        // ---
 
         // MainForm Initialization
         public MainForm()
         {
             InitializeComponent();
-            SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged; // Detect Resolution Changes
         }
 
         // MainForm Closed Event
@@ -183,7 +228,6 @@ namespace Mouse_Mender
 
                 // --Necessary cleanup if closing--
                 UnregisterHotKey(this.Handle, hotkeyId);
-                SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             }
         }
 
@@ -471,61 +515,43 @@ namespace Mouse_Mender
             groupBox1.Focus(); // Prevent unwanted focuses
         }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        static extern bool ClipCursor(ref Rectangle lpRect);
-
         // Lock Mouse
         private void LockMouse()
         {
             isRunning = true;
+            lockedScreen = GetTargetMonitor();
 
-            if (!resolutionChange)
-            {
-                lockedScreen = GetTargetMonitor();
+            // Set UI
+            label2.Text = "Enabled";
+            label2.ForeColor = Color.DarkGreen;
+            button1.Text = "Disable Mouse Lock";
 
-                // Set UI
-                label2.Text = "Enabled";
-                label2.ForeColor = Color.DarkGreen;
-
-                // Set Systray
-                statusDisabledToolStripMenuItem.Text = "Enabled";
-                enableMouseMenderToolStripMenuItem.Text = "Disable Mouse Lock";
-            }
+            // Set Systray
+            statusDisabledToolStripMenuItem.Text = "Enabled";
+            enableMouseMenderToolStripMenuItem.Text = "Disable Mouse Lock";
 
             // Lock Mouse
-            if (lockedScreen == null)
-                lockedScreen = GetTargetMonitor();
+            RegisterMouseForRawInput();  // Start capturing raw input
 
-            if (lockedScreen != null)
-            {
-                Rectangle bounds = lockedScreen.Bounds;
-                ClipCursor(ref bounds); // Lock the cursor within the bounds of the locked screen
-            }
         }
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        static extern bool ClipCursor(IntPtr lpRect);
 
         // Unlock Mouse
         private void unlockMouse()
         {
             isRunning = false;
+            lockedScreen = null;
 
-            if (!resolutionChange)
-            {
-                lockedScreen = null;
+            // Set UI
+            label2.Text = "Disabled";
+            label2.ForeColor = Color.DarkRed;
+            button1.Text = "Enable Mouse Lock";
 
-                // Set UI
-                label2.Text = "Disabled";
-                label2.ForeColor = Color.DarkRed;
-
-                // Set Systray
-                statusDisabledToolStripMenuItem.Text = "Disabled";
-                enableMouseMenderToolStripMenuItem.Text = "Enable Mouse Lock";
-            }
+            // Set Systray
+            statusDisabledToolStripMenuItem.Text = "Disabled";
+            enableMouseMenderToolStripMenuItem.Text = "Enable Mouse Lock";
 
             // Unlock Mouse
-            ClipCursor(IntPtr.Zero);
+            UnregisterMouseForRawInput();  // Stop capturing raw input
         }
 
         // Get Screen Based On Preference
@@ -544,25 +570,75 @@ namespace Mouse_Mender
             return null;
         }
 
-        // Re-apply the ClipCursor To Account For Resolution Change
-        private void OnDisplaySettingsChanged(object sender, EventArgs e)
+        // ---Raw Input API---
+
+        // Register Raw Inputs
+        private void RegisterMouseForRawInput()
         {
-            if (isRunning && lockedScreen != null)
+            RAWINPUTDEVICE[] rid = new RAWINPUTDEVICE[1];
+            rid[0].usUsagePage = 0x01; // Usage page for Generic Desktop Controls
+            rid[0].usUsage = 0x02; // Usage for Mouse
+            rid[0].dwFlags = 0x00000100; // RIDEV_INPUTSINK; to receive system-wide events
+            rid[0].hwndTarget = this.Handle; // follows keyboard focus
+
+            if (!RegisterRawInputDevices(rid, (uint)rid.Length, (uint)Marshal.SizeOf(rid[0])))
             {
-                // Set UI
-                label2.Text = "Resetting";
-                label2.ForeColor = Color.DarkGoldenrod;
-
-                resolutionChange = true;
-                unlockMouse(); // Resetting Locked Screen Settings
-                LockMouse();   // Re-locking the mouse cursor to the monitor
-                resolutionChange = false;
-
-                // Set UI Back
-                label2.Text = "Enabled";
-                label2.ForeColor = Color.DarkGreen;
+                throw new ApplicationException("Failed to register raw input device(s).");
             }
         }
+
+        // Unregister Raw Inputs
+        private void UnregisterMouseForRawInput()
+        {
+            RAWINPUTDEVICE[] rid = new RAWINPUTDEVICE[1];
+            rid[0].usUsagePage = 0x01;  // Usage page for Generic Desktop Controls
+            rid[0].usUsage = 0x02;      // Usage for Mouse
+            rid[0].dwFlags = 0x00000001; // RIDEV_REMOVE: Specifies the topmost removal of the device
+            rid[0].hwndTarget = IntPtr.Zero;
+
+            if (!RegisterRawInputDevices(rid, (uint)rid.Length, (uint)Marshal.SizeOf(rid[0])))
+            {
+                throw new ApplicationException("Failed to unregister raw input device(s).");
+            }
+        }
+
+        [DllImport("user32.dll")]
+        static extern int GetRawInputData(IntPtr hRawInput, uint uiCommand, out RAWINPUT pData, ref uint pcbSize, uint cbSizeHeader);
+
+        // Handle Raw Inputs
+        private void HandleRawInput(IntPtr lParam)
+        {
+            uint dwSize = 0;
+            GetRawInputData(lParam, RID_INPUT, out RAWINPUT input, ref dwSize, (uint)Marshal.SizeOf(typeof(RAWINPUTHEADER)));
+
+            if (input.header.dwType == RIM_TYPEMOUSE && isRunning)
+            {
+                Point currentPos = Cursor.Position;
+                Point newPos = new Point(currentPos.X + input.mouse.lLastX, currentPos.Y + input.mouse.lLastY);
+
+                // Check if the new position is within the bounds of the locked screen
+                if (!IsCursorWithinTargetMonitor(newPos))
+                {
+                    Cursor.Position = ClampToScreen(newPos, lockedScreen.Bounds);
+                }
+            }
+        }
+
+        // Check if Cursor is in monitor
+        private bool IsCursorWithinTargetMonitor(Point position)
+        {
+            Screen targetMonitor = GetTargetMonitor();
+            return targetMonitor.Bounds.Contains(position);
+        }
+
+        // Helper method to clamp the cursor position within the screen bounds
+        private Point ClampToScreen(Point position, Rectangle bounds)
+        {
+            int x = Math.Max(bounds.Left, Math.Min(bounds.Right - 1, position.X));
+            int y = Math.Max(bounds.Top, Math.Min(bounds.Bottom - 1, position.Y));
+            return new Point(x, y);
+        }
+
 
         // ---Hotkeys--
 
@@ -692,26 +768,33 @@ namespace Mouse_Mender
             RegisterHotKey(this.Handle, hotkeyId, modifiers, (uint)key);
         }
 
-        // Hotkey Pressed
+        // ---WindProc---
+
+        // Hotkey Pressed & Mouse Inputs
         protected override void WndProc(ref Message m)
         {
             base.WndProc(ref m);
 
-            if (m.Msg == WM_HOTKEY)
+            switch (m.Msg)
             {
-                if ((int)m.WParam == hotkeyId)
-                {
-                    // Toggle Mouse lock
-                    if (isRunning)
+                case WM_HOTKEY:
+                    if ((int)m.WParam == hotkeyId)
                     {
-                        unlockMouse();
+                        // Toggle Mouse lock
+                        if (isRunning)
+                        {
+                            unlockMouse();
+                        }
+                        else
+                        {
+                            LockMouse();
+                        }
                     }
-                    else
-                    {
-                        LockMouse();
-                    }
+                    break;
 
-                }
+                case WM_INPUT:
+                    HandleRawInput(m.LParam);
+                    break;
             }
         }
 
