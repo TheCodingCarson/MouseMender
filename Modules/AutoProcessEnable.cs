@@ -1,12 +1,10 @@
 ﻿using System.Diagnostics;
-using static Mouse_Mender.Modules.RawInput;
 
 namespace Mouse_Mender.Modules;
 
 internal class AutoProcessEnable
 {
     private MainForm mainForm;
-    private RawInput rawInput;
 
     // Constructor
     public AutoProcessEnable(MainForm mainFormInst)
@@ -62,19 +60,17 @@ internal class AutoProcessEnable
     }
 
     // Check for Process & Process Closed
-    public void CheckForProcesses(RawInput rawInputInst)
+    public void CheckForProcesses()
     {
-        rawInput = rawInputInst;
-
         bool processFound = Properties.Settings.Default.AutoEnableProcessList.Cast<string>().Any(process => Process.GetProcessesByName(process.Replace(".exe", "")).Length > 0);
         if (processFound && !mainForm.isMouseLockedByApp)
         {
-            rawInput.LockMouse();
+            mainForm.ToggleMouseLock();
             mainForm.isMouseLockedByApp = true;
         }
         else if (!processFound && mainForm.isMouseLockedByApp)
         {
-            rawInput.unlockMouse();
+            mainForm.ToggleMouseLock();
             mainForm.isMouseLockedByApp = false;
         }
     }
