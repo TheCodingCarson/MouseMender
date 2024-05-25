@@ -1,10 +1,18 @@
-﻿namespace Mouse_Mender
+﻿using Mouse_Mender.Modules;
+using System.Windows.Forms;
+
+namespace Mouse_Mender
 {
     public partial class QuickProcessAddForm : Form
     {
+        // Declared Variables
+        private MainForm mainForm;
+        private AutoProcessEnable autoProcessEnable;
+
         public QuickProcessAddForm()
         {
             InitializeComponent();
+            autoProcessEnable = new AutoProcessEnable(mainForm);
         }
 
         // FormLoad Event
@@ -19,22 +27,53 @@
         {
             if (!string.IsNullOrWhiteSpace(textBox1.Text) && textBox1.Text != "process.exe")
             {
+                String NewProcess;
 
-                // Add the new item to the settings collection
-                if (Properties.Settings.Default.AutoEnableProcessList == null)
+                // Check if the TextBox1 string ends with ".exe" and add it if it doesn't
+                if (!textBox1.Text.EndsWith(".exe"))
                 {
-                    Properties.Settings.Default.AutoEnableProcessList = new System.Collections.Specialized.StringCollection();
+                    NewProcess = textBox1.Text.Trim() + ".exe";
                 }
-                Properties.Settings.Default.AutoEnableProcessList.Add(textBox1.Text);
-                Properties.Settings.Default.Save();
+                else
+                {
+                    NewProcess = textBox1.Text.Trim();
+                }
 
-                // Close Form
-                this.Close();
+                // Check if the process already exists in the listBox1 or AutoEnableProcessList
+                bool existsInSettings = Properties.Settings.Default.AutoEnableProcessList != null &&
+                                        Properties.Settings.Default.AutoEnableProcessList.Contains(NewProcess);
+
+                if (existsInSettings)
+                {
+                    // Show a message box if the process already exists
+                    MessageBox.Show("The process already exists in the list.", "Duplicate Entry", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                else // Contuine adding the new process
+                {
+
+                    // Add the new item to the settings collection
+                    if (Properties.Settings.Default.AutoEnableProcessList == null)
+                    {
+                        Properties.Settings.Default.AutoEnableProcessList = new System.Collections.Specialized.StringCollection();
+                    }
+
+                    // Add the New Process (Standardized) to the StringCollection
+                    Properties.Settings.Default.AutoEnableProcessList.Add(NewProcess);
+
+                    // Save Process List
+                    Properties.Settings.Default.Save();
+
+                    // Reset Auto Enable in MainForm
+                    autoProcessEnable.RestartAutoEnableTimer();
+
+                    // Exit QuickProcessAddForm
+                    this.Close();
+                }
             }
             else
             {
                 // Show a message box if the input is invalid
-                MessageBox.Show("Please enter a valid process name. Format is 'processname.exe'", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Please enter a valid process name. Format is 'processname(.exe)'", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
