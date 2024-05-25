@@ -497,6 +497,7 @@
             exitToolStripMenuItem1.Name = "exitToolStripMenuItem1";
             exitToolStripMenuItem1.Size = new Size(176, 22);
             exitToolStripMenuItem1.Text = "Exit";
+            exitToolStripMenuItem1.Click += exitToolStripMenuItem1_Click;
             // 
             // checkProcessTimer
             // 
@@ -525,7 +526,7 @@
             FormClosed += MainForm_FormClosed;
             Load += MainForm_Load;
             Shown += MainForm_Shown;
-            LocationChanged += MainForm_LocationChanged;
+            ResizeEnd += MainForm_ResizeEnd;
             topmenuStrip.ResumeLayout(false);
             topmenuStrip.PerformLayout();
             groupBox1.ResumeLayout(false);
