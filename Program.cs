@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Mouse_Mender
 {
     internal static class Program
@@ -8,8 +10,11 @@ namespace Mouse_Mender
         [STAThread]
         static void Main()
         {
-            // To customize application configuration such as set high DPI settings or default font,
-            // see https://aka.ms/applicationconfiguration.
+            // Set "Below Normal" CPU Process Priority
+            Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.BelowNormal;
+            Thread.CurrentThread.IsBackground = true;
+
+            // Initialize Application
             ApplicationConfiguration.Initialize();
             Application.Run(new MainForm());
         }
