@@ -10,29 +10,27 @@ namespace Mouse_Mender
         private string codingcarsonURL = "https://www.youtube.com/@CodingCarson";
         private Version version = Assembly.GetExecutingAssembly().GetName().Version;
         private string versionFormatted;
-        private BackgroundHandler backgroundHandler;
         private Hotkeys hotkeys;
-        private RawInput rawInput;
+        private ClipCursorHook clipCursorHook;
         private UpdateChecker updateChecker;
         private AboutForm aboutForm;
         private AutoProcessEnable autoProcessEnable;
         private ProcessEditorForm processEditorForm;
         private QuickProcessAddForm quickProcessAddForm;
-        private Form hiddenForm;
         private HashSet<Keys> pressedKeys = new HashSet<Keys>();
         public Screen lockedScreen = null;
         public bool isRunning = false;
         public bool isMouseLockedByApp = false;
         public bool forceClose = false;
+        public bool editingHotkey = false;
 
         // MainForm Initialization
         public MainForm()
         {
             InitializeComponent();
             updateChecker = new UpdateChecker();
-            rawInput = new RawInput(this);
+            clipCursorHook = new ClipCursorHook(this);
             hotkeys = new Hotkeys(this);
-            backgroundHandler = new BackgroundHandler(this, hotkeys, rawInput);
             autoProcessEnable = new AutoProcessEnable(this);
         }
 
@@ -173,12 +171,6 @@ namespace Mouse_Mender
             }
         }
 
-        // Set Hidden Form Instance - MainForm Show Event Helper
-        public void SetHiddenForm(Form HiddenForm)
-        {
-            hiddenForm = HiddenForm;
-        }
-
         // MainForm FormClosing Event
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
@@ -200,14 +192,11 @@ namespace Mouse_Mender
             }
         }
 
-        // MainForm LocationChanged Event
-        private void MainForm_LocationChanged(object sender, EventArgs e)
+        // MainForm ResizeEnd Event - Detect Form Location Change (Ensures the new location is only saved once since resizing is disabled)
+        private void MainForm_ResizeEnd(object sender, EventArgs e)
         {
-            if (this.WindowState == FormWindowState.Normal)
-            {
-                Properties.Settings.Default.LastWindowLocation = this.Location;
-                Properties.Settings.Default.Save();
-            }
+            Properties.Settings.Default.LastWindowLocation = this.Location;
+            Properties.Settings.Default.Save();
         }
 
         // Check if loading Window location is visible - Helper Function
@@ -228,14 +217,7 @@ namespace Mouse_Mender
         // Toggle Mouse Lock
         private void enableMouseMenderToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (isRunning)
-            {
-                rawInput.unlockMouse();
-            }
-            else
-            {
-                rawInput.LockMouse();
-            }
+            ToggleMouseLock();
         }
 
         // Re-launch Button
@@ -408,7 +390,7 @@ namespace Mouse_Mender
 
                 enableHotkeysToolStripMenuItem1.Checked = false; // Systray
 
-                Hotkeys.UnregisterHotKey(hiddenForm.Handle, hotkeys.hotkeyId); // Disable Current Hotkey
+                Hotkeys.UnregisterHotKey(IntPtr.Zero, hotkeys.hotkeyId); // Disable Current Hotkey
             }
         }
 
@@ -450,14 +432,7 @@ namespace Mouse_Mender
         // Toggle Mouse Lock
         private void enableMouseMenderToolStripMenuItem1_Click(object sender, EventArgs e)
         {
-            if (isRunning)
-            {
-                rawInput.unlockMouse();
-            }
-            else
-            {
-                rawInput.LockMouse();
-            }
+            ToggleMouseLock();
         }
 
         // Toggle Hotkeys
@@ -489,7 +464,7 @@ namespace Mouse_Mender
 
                 enableHotkeysToolStripMenuItem1.Checked = false; // Systray
 
-                Hotkeys.UnregisterHotKey(hiddenForm.Handle, hotkeys.hotkeyId); // Disable Current Hotkey
+                Hotkeys.UnregisterHotKey(IntPtr.Zero, hotkeys.hotkeyId); // Disable Current Hotkey
             }
         }
 
@@ -500,21 +475,53 @@ namespace Mouse_Mender
             Application.Exit();
         }
 
-        // ---Main Functions---
+        // ---Form Buttons---
 
         // Enable & Disable Mouse Lock Button
         private void button1_Click(object sender, EventArgs e)
         {
-            if (isRunning)
-            {
-                rawInput.unlockMouse();
-            }
-            else
-            {
-                rawInput.LockMouse();
-            }
-
+            ToggleMouseLock();
             groupBox1.Focus(); // Prevent unwanted focuses
+        }
+
+        // ---Main Functions---
+
+        // Mouse Lock/Unlock
+        public void ToggleMouseLock()
+        {
+            // Enable Mouse Lock
+            if (!isRunning)
+            {
+                isRunning = true;
+
+                // Set UI
+                label2.Text = "Enabled";
+                label2.ForeColor = Color.DarkGreen;
+                button1.Text = "Disable Mouse Lock";
+
+                // Set Systray
+                statusDisabledToolStripMenuItem.Text = "Enabled";
+                enableMouseMenderToolStripMenuItem.Text = "Disable Mouse Lock";
+
+                //rawInput.LockMouse();
+                clipCursorHook.ClipCursorEnable();
+            }
+            else if (isRunning) //Disable Mouse Lock
+            {
+                isRunning = false;
+
+                // Set UI
+                label2.Text = "Disabled";
+                label2.ForeColor = Color.DarkRed;
+                button1.Text = "Enable Mouse Lock";
+
+                // Set Systray
+                statusDisabledToolStripMenuItem.Text = "Disabled";
+                enableMouseMenderToolStripMenuItem.Text = "Enable Mouse Lock";
+
+                //rawInput.unlockMouse();
+                clipCursorHook.ClipCursorDisable();
+            }
         }
 
         // ---Hotkeys--
@@ -522,6 +529,7 @@ namespace Mouse_Mender
         // HotKey Textbox - Enter
         private void textBox1_Enter(object sender, EventArgs e)
         {
+            editingHotkey = true;
             textBox1.KeyDown += textBox1_KeyDown;
             textBox1.KeyUp += textBox1_KeyUp;
 
@@ -532,6 +540,7 @@ namespace Mouse_Mender
         // HotKey Textbox - Leave
         private void textBox1_Leave(object sender, EventArgs e)
         {
+            editingHotkey = false;
             textBox1.KeyDown -= textBox1_KeyDown;
             textBox1.KeyUp -= textBox1_KeyUp;
 
@@ -591,7 +600,7 @@ namespace Mouse_Mender
         // Auto Enable Timer Tick
         private void checkProcessTimer_Tick(object sender, EventArgs e)
         {
-            autoProcessEnable.CheckForProcesses(rawInput);
+            autoProcessEnable.CheckForProcesses();
         }
 
         // ---Bottom Info Bar---
@@ -609,6 +618,5 @@ namespace Mouse_Mender
                 Debug.WriteLine("ERROR: Could not open the URL: " + ex.Message);
             }
         }
-
     }
 }
