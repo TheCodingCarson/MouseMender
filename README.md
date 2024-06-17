@@ -1,5 +1,6 @@
 # MouseMender
-A small program wrote in C# to lock your mouse cursor to the desired screen.
+A small program wrote in C# to lock your mouse cursor to the desired screen.</br>
+**Uses Roughly 20mb of ram**
 
 | Main | Process Editor | Monitor Preference | Settings |
 | :----: | :----: | :----: | :----: |
